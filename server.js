@@ -1,51 +1,43 @@
-// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { connectDB } from "./config/db.js";
-import registrationRoutes from "./routes/registrationRoutes.js";
-import adminRoutes from "./routes/adminRoutes.js";
+import path from "path";
+import mongoose from "mongoose";
 
-dotenv.config();
-connectDB();
+// Routes
+import grievanceRoutes from "./routes/grievanceRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import regionRoutes from "./routes/regionRoutes.js";
+
+dotenv.config({
+  path: path.resolve("./.env")
+});
+
+// MongoDB Connection
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch(err => console.error("❌ DB Error:", err));
 
 const app = express();
 
-// Middleware
+// Middlewares
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    status: "ok",
-    message: "Backend is running ✅",
-    uptime: process.uptime(), // seconds
-    timestamp: new Date().toISOString(),
-  });
+// API Routes
+app.use("/api/grievances", grievanceRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/regions", regionRoutes);
+
+// Test route
+app.get("/", (_, res) => {
+  res.send("TVK Grievance Backend Running 🚀");
 });
 
-// Optional ready endpoint (for load balancers)
-app.get("/ready", (req, res) => {
-  res.status(200).json({
-    status: "ready",
-    message: "Server is ready to accept requests ✅",
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// API routes
-app.use("/api", registrationRoutes);
-app.use("/api/admin", adminRoutes);
-
-// 404 handler for unknown routes
-app.use((req, res) => {
-  res.status(404).json({ error: "Route not found" });
-});
-
-// Start server
-const PORT = process.env.PORT || 4001;
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+// Start Server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () =>
+  console.log(`🚀 Server running on port ${PORT}`)
+);

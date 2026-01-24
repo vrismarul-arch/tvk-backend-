@@ -1,15 +1,29 @@
-import mongoose from "mongoose"
-import dotenv from "dotenv"
-import Admin from "./models/Admin.js"
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import bcrypt from "bcryptjs";
+import User from "./models/User.js";
 
-dotenv.config()
+dotenv.config();
 
-await mongoose.connect(process.env.MONGO_URI)
+await mongoose.connect(process.env.MONGO_URI);
 
-await Admin.create({
-  email: "admin@vrism.in",
-  password: "admin123",
-})
+const exist = await User.findOne({ email: "admin@vrism.in" });
 
-console.log("Admin created")
-process.exit()
+if (!exist) {
+  const hash = await bcrypt.hash("admin123", 10);
+
+  await User.create({
+    name: "Super Admin",
+    email: "admin@vrism.in",
+    password: hash,
+    role: "superadmin",
+    mainRegion: "மாதவரம் பகுதி",
+    subRegion: "வட்டம் 16"
+  });
+
+  console.log("✅ Super Admin created");
+} else {
+  console.log("⚠️ Admin already exists");
+}
+
+process.exit();
