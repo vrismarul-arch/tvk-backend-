@@ -1,14 +1,14 @@
 import Grievance from "../models/Grievance.js";
 import { supabase } from "../config/supabase.js";
 
-// Upload helper
+/* ================= SUPABASE UPLOAD ================= */
 const uploadToSupabase = async (file, folder) => {
   const fileName = `${folder}/${Date.now()}-${file.originalname}`;
 
   const { error } = await supabase.storage
     .from("tvk-grievance")
     .upload(fileName, file.buffer, {
-      contentType: file.mimetype
+      contentType: file.mimetype,
     });
 
   if (error) throw error;
@@ -20,7 +20,7 @@ const uploadToSupabase = async (file, folder) => {
   return data.publicUrl;
 };
 
-// 1. CREATE
+/* ================= CREATE GRIEVANCE ================= */
 export const submitGrievance = async (req, res) => {
   try {
     const {
@@ -31,16 +31,18 @@ export const submitGrievance = async (req, res) => {
       subRegion,
       grievanceType,
       details,
-      location
+      location,
     } = req.body;
 
+    /* Upload images */
     const imageUrls = [];
     if (req.files?.images) {
-      for (let img of req.files.images) {
+      for (const img of req.files.images) {
         imageUrls.push(await uploadToSupabase(img, "img"));
       }
     }
 
+    /* Upload audio */
     let audioUrl = "";
     if (req.files?.audio?.[0]) {
       audioUrl = await uploadToSupabase(req.files.audio[0], "audio");
@@ -56,98 +58,171 @@ export const submitGrievance = async (req, res) => {
       details,
       location,
       images: imageUrls,
-      audio: audioUrl
+      audio: audioUrl,
+      status: "pending",
+
+      history: [
+        {
+          action: "submitted",
+          note: "Grievance created",
+          images: imageUrls,
+          audio: audioUrl,
+          status: "pending",
+          addedBy: name || "Citizen",
+          role: "user",
+        },
+      ],
     });
 
     res.status(201).json({
       success: true,
       message: "Grievance submitted",
-      data: grievance
+      data: grievance,
     });
-
   } catch (err) {
-    res.status(500).json({ success:false, error: err.message });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// 2. READ (role based)
-export const getGrievances = async (req,res)=>{
-  try{
+/* ================= GET GRIEVANCES ================= */
+export const getGrievances = async (req, res) => {
+  try {
     const user = req.user;
     let filter = {};
 
-    if(user.role === "user"){
+    if (user.role === "user") {
       filter = {
         mainRegion: user.mainRegion,
-        subRegion: user.subRegion
+        subRegion: user.subRegion,
       };
     }
 
-    const grievances = await Grievance
-      .find(filter)
-      .sort({ createdAt: -1 });
-
-    res.json({
-      count: grievances.length,
-      data: grievances
+    const grievances = await Grievance.find(filter).sort({
+      createdAt: -1,
     });
 
-  }catch(err){
-    res.status(500).json({error:err.message});
+    res.json({ count: grievances.length, data: grievances });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// 3. UPDATE
-export const updateStatus = async (req,res)=>{
-  try{
+/* ================= UPDATE STATUS ================= */
+export const updateStatus = async (req, res) => {
+  try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, note } = req.body;
+    const user = req.user;
 
-    const grievance = await Grievance.findByIdAndUpdate(
-      id,
-      { status },
-      { new:true }
-    );
+    const grievance = await Grievance.findById(id);
+    if (!grievance)
+      return res
+        .status(404)
+        .json({ success: false, message: "Grievance not found" });
 
-    if(!grievance)
-      return res.status(404).json({msg:"Not found"});
+    grievance.status = status;
+
+    grievance.history.push({
+      action: "status_changed",
+      note: note || `Status updated to ${status}`,
+      status,
+      images: [],
+      audio: "",
+      addedBy: user.name,
+      role: user.role,
+    });
+
+    await grievance.save();
 
     res.json({
-      success:true,
-      data: grievance
+      success: true,
+      message: "Status updated",
+      data: grievance,
     });
-  }catch(err){
-    res.status(500).json({error:err.message});
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// 4. DELETE
-export const deleteGrievance = async (req,res)=>{
-  try{
+/* ================= ADD NOTE / UPDATE ================= */
+export const submitNoteOrUpdate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { note, action, status } = req.body;
+    const user = req.user;
+
+    const grievance = await Grievance.findById(id);
+    if (!grievance)
+      return res
+        .status(404)
+        .json({ success: false, message: "Grievance not found" });
+
+    /* Upload images */
+    const imageUrls = [];
+    if (req.files?.images) {
+      for (const img of req.files.images) {
+        imageUrls.push(await uploadToSupabase(img, "img"));
+      }
+      grievance.images.push(...imageUrls);
+    }
+
+    /* Upload audio */
+    let audioUrl = "";
+    if (req.files?.audio?.[0]) {
+      audioUrl = await uploadToSupabase(req.files.audio[0], "audio");
+      grievance.audio = audioUrl;
+    }
+
+    if (status) grievance.status = status;
+
+    grievance.history.push({
+      action: action || "admin_note",
+      note: note || "",
+      images: imageUrls,
+      audio: audioUrl,
+      status: grievance.status,
+      addedBy: user.name,
+      role: user.role,
+    });
+
+    await grievance.save();
+
+    res.json({
+      success: true,
+      message: "Grievance updated",
+      data: grievance,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/* ================= DELETE GRIEVANCE ================= */
+export const deleteGrievance = async (req, res) => {
+  try {
     const { id } = req.params;
     const user = req.user;
 
     const grievance = await Grievance.findById(id);
-    if(!grievance) 
-      return res.status(404).json({msg:"Not found"});
+    if (!grievance)
+      return res
+        .status(404)
+        .json({ success: false, message: "Grievance not found" });
 
-    if(user.role === "user"){
-      if(
-        grievance.mainRegion !== user.mainRegion ||
-        grievance.subRegion !== user.subRegion
-      ){
-        return res.status(403).json({msg:"Access denied"});
-      }
+    if (
+      user.role === "user" &&
+      (grievance.mainRegion !== user.mainRegion ||
+        grievance.subRegion !== user.subRegion)
+    ) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Access denied" });
     }
 
     await grievance.deleteOne();
 
-    res.json({
-      success:true,
-      message:"Grievance deleted"
-    });
-
-  }catch(err){
-    res.status(500).json({error:err.message});
+    res.json({ success: true, message: "Grievance deleted" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
