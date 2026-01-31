@@ -77,6 +77,7 @@ export const submitGrievance = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Grievance submitted",
+      grievanceId: grievance.grievanceId, // 🔥 IMPORTANT
       data: grievance,
     });
   } catch (err) {
@@ -84,13 +85,13 @@ export const submitGrievance = async (req, res) => {
   }
 };
 
-/* ================= GET GRIEVANCES ================= */
+/* ================= GET ALL GRIEVANCES ================= */
 export const getGrievances = async (req, res) => {
   try {
     const user = req.user;
     let filter = {};
 
-    if (user.role === "user") {
+    if (user?.role === "user") {
       filter = {
         mainRegion: user.mainRegion,
         subRegion: user.subRegion,
@@ -101,20 +102,41 @@ export const getGrievances = async (req, res) => {
       createdAt: -1,
     });
 
-    res.json({ count: grievances.length, data: grievances });
+    res.json({
+      success: true,
+      count: grievances.length,
+      data: grievances,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-/* ================= UPDATE STATUS ================= */
+/* ================= GET SINGLE BY grievanceId ================= */
+export const getGrievanceById = async (req, res) => {
+  try {
+    const { id } = req.params; // C-122
+
+    const grievance = await Grievance.findOne({ grievanceId: id });
+    if (!grievance)
+      return res
+        .status(404)
+        .json({ success: false, message: "Grievance not found" });
+
+    res.json({ success: true, data: grievance });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/* ================= UPDATE STATUS (BY grievanceId) ================= */
 export const updateStatus = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params; // C-122
     const { status, note } = req.body;
     const user = req.user;
 
-    const grievance = await Grievance.findById(id);
+    const grievance = await Grievance.findOne({ grievanceId: id });
     if (!grievance)
       return res
         .status(404)
@@ -147,11 +169,11 @@ export const updateStatus = async (req, res) => {
 /* ================= ADD NOTE / UPDATE ================= */
 export const submitNoteOrUpdate = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params; // C-122
     const { note, action, status } = req.body;
     const user = req.user;
 
-    const grievance = await Grievance.findById(id);
+    const grievance = await Grievance.findOne({ grievanceId: id });
     if (!grievance)
       return res
         .status(404)
@@ -197,13 +219,13 @@ export const submitNoteOrUpdate = async (req, res) => {
   }
 };
 
-/* ================= DELETE GRIEVANCE ================= */
+/* ================= DELETE (BY grievanceId) ================= */
 export const deleteGrievance = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params; // C-122
     const user = req.user;
 
-    const grievance = await Grievance.findById(id);
+    const grievance = await Grievance.findOne({ grievanceId: id });
     if (!grievance)
       return res
         .status(404)

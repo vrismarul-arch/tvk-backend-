@@ -1,5 +1,5 @@
-// models/Grievance.js
 import mongoose from "mongoose";
+import Counter from "./Counter.js";
 
 const historySchema = new mongoose.Schema({
   action: String,
@@ -13,6 +13,11 @@ const historySchema = new mongoose.Schema({
 });
 
 const grievanceSchema = new mongoose.Schema({
+  grievanceId: {
+    type: String,
+    unique: true
+  },
+
   name: { type: String, required: true },
   phone: { type: String, required: true },
   address: String,
@@ -33,7 +38,6 @@ const grievanceSchema = new mongoose.Schema({
     default: "pending"
   },
 
-  // 🔥 Assignment
   assignedTo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User"
@@ -41,6 +45,19 @@ const grievanceSchema = new mongoose.Schema({
   assignedName: String,
 
   history: [historySchema]
-},{ timestamps:true });
+}, { timestamps: true });
+
+/* 🔥 AUTO-GENERATE C-XXX (NO next()) */
+grievanceSchema.pre("save", async function () {
+  if (this.grievanceId) return;
+
+  const counter = await Counter.findOneAndUpdate(
+    { name: "grievance" },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+
+  this.grievanceId = `C-${counter.seq}`;
+});
 
 export default mongoose.model("Grievance", grievanceSchema);
