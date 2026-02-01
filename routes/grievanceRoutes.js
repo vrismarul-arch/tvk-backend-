@@ -12,7 +12,6 @@ import {
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Create new grievance
 router.post(
   "/submit",
   upload.fields([
@@ -22,13 +21,9 @@ router.post(
   submitGrievance
 );
 
-// Get grievances (role-based)
 router.get("/get", protect, getGrievances);
-
-// Update status only
 router.patch("/:id/status", protect, updateStatus);
 
-// Add note / update grievance (images/audio/status)
 router.patch(
   "/:id",
   protect,
@@ -39,7 +34,6 @@ router.patch(
   submitNoteOrUpdate
 );
 
-// Delete grievance
 router.delete("/:id", protect, deleteGrievance);
 
 export default router;
