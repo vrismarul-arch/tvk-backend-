@@ -31,10 +31,10 @@ const grievanceSchema = new mongoose.Schema({
 
   images: [String],
   audio: String,
-
+email: { type: String },
   status: {
     type: String,
-    enum: ["pending", "inprogress", "completed"],
+    enum: ["pending", "inprogress", "completed","onhold"],
     default: "pending"
   },
 

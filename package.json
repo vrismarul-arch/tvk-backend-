@@ -21,6 +21,7 @@
     "mongoose": "^9.1.5",
     "multer": "^2.0.2",
     "mysql2": "^3.16.1",
+    "nodemailer": "^9.0.1",
     "sequelize": "^6.37.7"
   },
   "devDependencies": {
